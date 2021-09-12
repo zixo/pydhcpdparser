@@ -25,7 +25,7 @@ ddns_tokens = (
 
 subnet_tokens = (
     'SUBNET', 'NETMASK', 'POOL', 'FAILOVER', 'PEER', 'RANGE',
-    'OPTION', 'BROADCAST_ADDR', 'ROUTERS', 'DOMAIN_NAME_SERVERS', 'DOMAIN_NAME',
+    'OPTION', 'BROADCAST_ADDR', 'ROUTERS', 'DOMAIN_NAME_SERVERS', 'DOMAIN_NAME', 'NETBIOS_NAME_SERVERS',
 )
 
 allow_deny_pool_ctxt_tokens = (
@@ -446,7 +446,6 @@ def t_NEXT_SERVER(t):
     r'next-server'
     return t
 
-
 def t_OMAPI_PORT(t):
     r'omapi-port'
     return t
@@ -469,6 +468,11 @@ def t_MEMBERS_OF(t):
 
 def t_DOMAIN_NAME(t):
     r'domain-name'
+    return t
+
+
+def t_NETBIOS_NAME_SERVERS(t):
+    r'netbios-name-servers'
     return t
 
 
@@ -721,12 +725,10 @@ def p_subnet_decl(p):
 
 
 def p_subnet_block(p):
-    ''' subnet_block : pool_decl
-                     | range_stmt
-                     | option_decls
+    ''' subnet_block : option_decls
                      | pool_decl option_decls
-                     | option_decls range_stmt
-
+                     | option_decls pool_decl
+                     | option_decls range_stmts
     '''
     p[0] = {}
     for i in range(1, len(p)):
@@ -742,11 +744,12 @@ def p_pool_decl(p):
 
 def p_pool_content(p):
     ''' pool_content : failover_stmt pool_content
-                     | range_stmt pool_content
+                     | range_stmts pool_content
                      | pool_allow_deny_decls pool_content
                      | empty
     '''
     p[0] = p[1]
+
     if len(p) > 2:
         p[0].update(p[2])
 
@@ -757,11 +760,23 @@ def p_failover_stmt(p):
     '''
     p[0] = {p[1]: (p[2], p[3])}
 
+def p_range_stmts(p):
+    ''' range_stmts : range_stmt
+                    | range_stmt range_stmts
+    '''
+
+    p[0] = {'ranges': []}
+    if 'range' in p[1]:
+        p[0]['ranges'].append(p[1]['range'])
+    if len(p) > 2:
+        p[0]['ranges'] = p[0]['ranges'] + p[2]['ranges']
+
 
 def p_range_stmt(p):
     ''' range_stmt : RANGE range_addr_stmt SEMICOLON
                    | RANGE DYNAMIC_BOOTP range_addr_stmt SEMICOLON
     '''
+
     if len(p) > 4:
         p[0] = {p[1]: p[3]}
     else:
@@ -854,6 +869,7 @@ def p_op_key(p):
                | ROUTERS
                | DOMAIN_NAME_SERVERS
                | DOMAIN_NAME
+               | NETBIOS_NAME_SERVERS
                | HOST_NAME
     '''
     p[0] = p[1]
